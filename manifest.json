@@ -1,0 +1,14 @@
+{
+  "manifest_version": 2,
+
+  "name": "NeatOTP",
+  "description": "This extention, in conjunction with the NeatOTP key fob will automatically handle your second factor authentication for you!",
+  "version": "0.1",
+  "content_scripts" : [{
+    "matches" : [ "<all_urls>"],
+    "js" : ["main.js"]
+  }],
+  "permissions": [
+    "tabs","<all_urls>"
+  ]
+}
