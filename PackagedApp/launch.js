@@ -1,4 +1,4 @@
-const device = '/dev/cu.usbmodemfd121';
+const device = '/dev/tty.usbmodemfd131';
 const serial = chrome.serial;
 const timeout = 100;
 
@@ -20,7 +20,6 @@ SerialConnection.prototype.read = function(callback) {
   serial.read(this.connectionId, 1, this.onRead.bind(this));
   this.callbacks.read = callback;
 };
-
 SerialConnection.prototype.readLine = function(callback) {
   // Only works for open serial ports.
   if (this.connectionId < 0) {
@@ -30,7 +29,7 @@ SerialConnection.prototype.readLine = function(callback) {
 
   // Keep reading bytes until we've found a newline.
   var readLineHelper = function(readInfo) {
-    var char = readInfo.message;
+    var char = this._arrayBufferToString(readInfo.data);
     if (char == '') {
       // Nothing in the buffer. Try reading again after a small timeout.
       setTimeout(function() {
@@ -56,9 +55,8 @@ SerialConnection.prototype.write = function(msg, callback) {
     throw 'Invalid connection';
   }
   this.callbacks.write = callback;
-  this._stringToArrayBuffer(msg, function(array) {
-    serial.write(this.connectionId, array, this.onWrite.bind(this));
-  }.bind(this));
+  var array = this._stringToArrayBuffer(msg);
+  serial.write(this.connectionId, array, this.onWrite.bind(this));
 };
 
 SerialConnection.prototype.onOpen = function(connectionInfo) {
@@ -82,22 +80,17 @@ SerialConnection.prototype.onWrite = function(writeInfo) {
 };
 
 /** From tcp-client */
-SerialConnection.prototype._arrayBufferToString = function(buf, callback) {
-  var blob = new Blob([buf]);
-  var f = new FileReader();
-  f.onload = function(e) {
-    callback(e.target.result)
-  }
-  f.readAsText(blob);
+SerialConnection.prototype._arrayBufferToString = function(buf) {
+  return String.fromCharCode.apply(null, new Uint8Array(buf));
 }
 
-SerialConnection.prototype._stringToArrayBuffer = function(str, callback) {
-  var blob = new Blob([str]);
-  var f = new FileReader();
-  f.onload = function(e) {
-    callback(e.target.result);
+SerialConnection.prototype._stringToArrayBuffer = function(str) {
+  var buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
+  var bufView = new Uint16Array(buf);
+  for (var i=0, strLen=str.length; i<strLen; i++) {
+    bufView[i] = str.charCodeAt(i);
   }
-  f.readAsArrayBuffer(blob);
+  return buf;
 }
 
 
@@ -122,5 +115,5 @@ function readNextLine() {
 }
 
 function log(msg) {
-	console.log(msg);
+  console.log(msg);
 }
