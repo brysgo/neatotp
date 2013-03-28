@@ -12,6 +12,9 @@ typedef unsigned long time_t;
 uint8_t hmacKey1[16];
 
 void setup() {
+  for (int i=0; i < 16; ++i) {
+    hmacKey1[i] = 0x00;
+  }
   Serial.begin(9600);
 }
 
@@ -81,11 +84,10 @@ void loop() {
   
   if(Serial.available()) {
     
-   //requestHandler();
+   requestHandler();
    
   }
 
-  Serial.println("abcd\n");  
   delay(1000);
     
 }

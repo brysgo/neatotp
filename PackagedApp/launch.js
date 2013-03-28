@@ -73,7 +73,7 @@ SerialConnection.prototype.onRead = function(readInfo) {
 };
 
 SerialConnection.prototype.onWrite = function(writeInfo) {
-  log('wrote:' + writeInfo.bytesWritten);
+  console.log('wrote:' + writeInfo.bytesWritten);
   if (this.callbacks.write) {
     this.callbacks.write(writeInfo);
   }
@@ -85,8 +85,8 @@ SerialConnection.prototype._arrayBufferToString = function(buf) {
 }
 
 SerialConnection.prototype._stringToArrayBuffer = function(str) {
-  var buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
-  var bufView = new Uint16Array(buf);
+  var buf = new ArrayBuffer(str.length);
+  var bufView = new Uint8Array(buf);
   for (var i=0, strLen=str.length; i<strLen; i++) {
     bufView[i] = str.charCodeAt(i);
   }
@@ -94,26 +94,36 @@ SerialConnection.prototype._stringToArrayBuffer = function(str) {
 }
 
 
+
+
 ////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////
+
+var seed = "S" + "AAAAAAAAAAAAAAAA";
 
 var ser = new SerialConnection();
-ser.connect(device, function() {
-  log('connected to: ' + device);
-  ser.write('T'+parseInt((new Date()).getTime()/1000), function() {
-  });
-  readNextLine();
-});
 
-function readNextLine() {
-  ser.readLine(function(line) {
-    log('readline: ' + line);
+function go() {
+  ser.connect(device, function() {
+    console.log('connected to: ' + device);
+
+    console.log('seed: ', seed);
+    ser.write('S' + seed, function(writeInfo) { });
+
+    ser.write('T'+parseInt((new Date()).getTime()/1000), function(writeInfo) {
+    });
     readNextLine();
   });
 }
 
-function log(msg) {
-  console.log(msg);
+function readNextLine() {
+  ser.readLine(function(line) {
+    console.log('readline: ' + line);
+  });
+
+  // setTimeout(readNextLine, 1000);
 }
+
+go();

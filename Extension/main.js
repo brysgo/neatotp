@@ -1,4 +1,3 @@
-var otpField = document.getElementById("smsUserPin");
 var emailField = document.getElementById("Email")
 if (emailField != null) {
   emailField.addEventListener("blur", function() {
@@ -8,6 +7,8 @@ if (emailField != null) {
     localStorage.setItem('email', email);
   }, false);
 }
+
+var otpField = document.getElementById("smsUserPin");
 if (otpField != null) {
   document.getElementById("smsUserPin").value = '123456'
 }
