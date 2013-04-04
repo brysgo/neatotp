@@ -1,4 +1,4 @@
-const device = '/dev/tty.usbmodemfd131';
+const device = '/dev/tty.usbmodemfd121';
 const serial = chrome.serial;
 const timeout = 100;
 
@@ -29,7 +29,7 @@ SerialConnection.prototype.readLine = function(callback) {
 
   // Keep reading bytes until we've found a newline.
   var readLineHelper = function(readInfo) {
-    var char = this._arrayBufferToString(readInfo.data);
+    var char = arrayBufferToString(readInfo.data);
     if (char == '') {
       // Nothing in the buffer. Try reading again after a small timeout.
       setTimeout(function() {
@@ -55,7 +55,7 @@ SerialConnection.prototype.write = function(msg, callback) {
     throw 'Invalid connection';
   }
   this.callbacks.write = callback;
-  var array = this._stringToArrayBuffer(msg);
+  var array = stringToArrayBuffer(msg);
   serial.write(this.connectionId, array, this.onWrite.bind(this));
 };
 
@@ -80,11 +80,11 @@ SerialConnection.prototype.onWrite = function(writeInfo) {
 };
 
 /** From tcp-client */
-SerialConnection.prototype._arrayBufferToString = function(buf) {
+arrayBufferToString = function(buf) {
   return String.fromCharCode.apply(null, new Uint8Array(buf));
 }
 
-SerialConnection.prototype._stringToArrayBuffer = function(str) {
+stringToArrayBuffer = function(str) {
   var buf = new ArrayBuffer(str.length);
   var bufView = new Uint8Array(buf);
   for (var i=0, strLen=str.length; i<strLen; i++) {
@@ -127,3 +127,54 @@ function readNextLine() {
 }
 
 go();
+
+var socket = chrome.socket;
+var socketInfo;
+
+var onAccept = function(acceptInfo) {
+  console.log("ACCEPT", acceptInfo)
+  var socketId = acceptInfo.socketId;
+  socket.read(socketId, function(readInfo) {
+    console.log("READ", readInfo);
+    // Parse the request.
+    var data = arrayBufferToString(readInfo.data);
+    if(data.indexOf("GET ") == 0) {
+
+      // we can only deal with GET requests
+      var uriEnd =  data.indexOf(" ", 4);
+      if(uriEnd < 0) { /* throw a wobbler */ return; }
+      var uri = data.substring(4, uriEnd);
+      // strip query string
+      var q = uri.indexOf("?");
+      if (q != -1) {
+        uri = uri.substring(0, q);
+      }
+      var msg = "window.location=window.location+'&smsUserPin=999999';"
+      var outputBuffer = stringToArrayBuffer("HTTPS/1.0 200 OK\nContent-length: " + msg.length + "\nContent-type: application/javascript\n\n"+msg);
+      socket.write(socketId, outputBuffer, function(writeInfo) {
+        console.log("WRITE", writeInfo);
+        socket.destroy(socketId);
+        socket.accept(socketInfo.socketId, onAccept);
+      });
+    }
+    else {
+      // Throw an error
+      socket.destroy(socketId);
+    }
+  });
+};
+
+chrome.storage.local.get('last_socket', function(result) {
+  var socketId = result['last_socket'];
+  if (typeof(socketId)==="number") socket.destroy(socketId);
+  socket.create("tcp", {}, function(_socketInfo) {
+    socketInfo = _socketInfo;
+    chrome.storage.local.set({'last_socket': socketInfo.socketId}, function() {});
+    socket.listen(socketInfo.socketId, '127.0.0.1', 8083, 50, function(result) {
+      console.log("LISTENING:", result);
+      socket.accept(socketInfo.socketId, onAccept);
+    });
+  });
+});
+
+
