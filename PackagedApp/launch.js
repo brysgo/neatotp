@@ -1,4 +1,3 @@
-const device = '/dev/tty.usbmodemfd131';
 const serial = chrome.serial;
 const timeout = 100;
 
@@ -12,10 +11,43 @@ SerialConnection.prototype.connect = function(device, callback) {
   this.callbacks.connect = callback;
 };
 
+SerialConnection.prototype.findAndConnect = function(callback) {
+  var _this = this;
+  var done = false;
+  serial.getPorts(function(portList) {
+    iter = function(i) {
+      if (i == portList.length) return 'Device not found';
+      var port = portList[i];
+      if (port.search('Bluetooth') != -1) return iter(i+1);
+      console.log(port);
+      try {
+        _this.connect(port, function() {
+          _this.write(_this.ping, function(writeInfo) {
+            _this.readLine(function(ack) {
+              if (!_this.ack(ack)) {
+                return serial.close(_this.connectionId,function(){
+                  return iter(i+1);
+                });
+              }
+            });
+          });
+        });
+      } catch (e) {
+        if (_this.connectionId != -1) {
+          return serial.close(_this.connectionId,function(){
+            return iter(i+1);
+          });
+        }
+      }
+    };
+    return iter(0);
+  });
+};
+
 SerialConnection.prototype.read = function(callback) {
   // Only works for open serial ports.
   if (this.connectionId < 0) {
-    throw 'Invalid connection';
+    throw "Invalid connection";
   }
   serial.read(this.connectionId, 1, this.onRead.bind(this));
   this.callbacks.read = callback;
@@ -23,7 +55,7 @@ SerialConnection.prototype.read = function(callback) {
 SerialConnection.prototype.readLine = function(callback) {
   // Only works for open serial ports.
   if (this.connectionId < 0) {
-    throw 'Invalid connection';
+    throw "Invalid connection";
   }
   var line = '';
 
@@ -52,7 +84,7 @@ SerialConnection.prototype.readLine = function(callback) {
 SerialConnection.prototype.write = function(msg, callback) {
   // Only works for open serial ports.
   if (this.connectionId < 0) {
-    throw 'Invalid connection';
+    throw "Invalid connection";
   }
   this.callbacks.write = callback;
   var array = stringToArrayBuffer(msg);
@@ -104,29 +136,16 @@ stringToArrayBuffer = function(str) {
 var seed = "S" + "AAAAAAAAAAAAAAAA";
 
 var ser = new SerialConnection();
-
-function go() {
-  ser.connect(device, function() {
-    console.log('connected to: ' + device);
-
-    // console.log('seed: ', seed);
-    // ser.write('S' + seed, function(writeInfo) { });
-
-    ser.write('T'+parseInt((new Date()).getTime()/1000), function(writeInfo) {
-    });
-    readNextLine();
-  });
+ser.ping = 'T0000000000'
+ser.ack = function(response) {
+  console.log(response);
+  if (response && response.length == 6)
+    return true;
+  else
+    return false;
 }
+ser.findAndConnect();
 
-function readNextLine() {
-  ser.readLine(function(line) {
-    console.log('readline: ' + line);
-  });
-
-  // setTimeout(readNextLine, 1000);
-}
-
-go();
 function getQueryVariable(url,name){
   if(name=(new RegExp('[?&]'+encodeURIComponent(name)+'=([^&]*)')).exec(url))
     return decodeURIComponent(name[1]);
@@ -151,6 +170,8 @@ var onAccept = function(acceptInfo) {
 
       var origURL = getQueryVariable(uri,'url');
       if (!getQueryVariable(origURL,'smsUserPin')) {
+        try {
+        if (ser.connectionId == -1) ser.findAndConnect();
         ser.write('T'+parseInt((new Date()).getTime()/1000), function(writeInfo) {
           ser.readLine(function(otp) {
             var msg = "<html><head><script>top.location='"+origURL+"&smsUserPin="+otp+"';</script></head><body></body></html>";
@@ -162,6 +183,11 @@ var onAccept = function(acceptInfo) {
             });
           });
         });
+        } catch (e) {
+          console.error(e);
+          var msg = 'There was a problem connecting to your NeatOTP device!';
+          socket.write(socketId, stringToArrayBuffer("HTTPS/1.0 200 OK\nContent-length: " + msg.length + "\nContent-type: text/html\n\n"+msg),function(){});
+        }
       }
     }
     else {

@@ -1,13 +1,13 @@
 {
-  "name": "Serial Test",
-  "version": "1",
+  "name": "NeatOTP",
+  "version": "0.1",
   "manifest_version": 2,
   "permissions": [{"socket":["tcp-connect", "tcp-listen"]},"serial","storage"],
   "minimum_chrome_version": "23",
   "app": {
     "background": {
       "scripts": ["launch.js"],
-      "transient": true
+      "transient": false
     }
   }
 }
