@@ -1,4 +1,5 @@
 #include "sha1.h"
+#include <EEPROM.h>
 
 #define SHORT_MSG_LEN  11  // the smallest of the below lengths
 #define TIME_MSG_LEN   11  // time sync to PC is HEADER followed by Unix time_t as ten ASCII digits
@@ -7,17 +8,16 @@
 #define TIME_HEADER  'T'   // Header tag for serial time sync message
 #define SEED_HEADER  'S'   // Header tag for serial seed sync message
 
-typedef unsigned long time_t;
 
-uint8_t hmacKey1[16];
+typedef unsigned long time_t;
+uint8_t hmacKey1[10];
 
 void setup() {
-  for (int i=0; i < 16; ++i) {
-    hmacKey1[i] = 0x00;
+  for (int i=0; i < 10; ++i) {
+    hmacKey1[i] = EEPROM.read(i);
   }
   Serial.begin(9600);
 }
-
 
 long truncatedHashWithTime(long time) {
    uint8_t byteArray[8];
@@ -34,7 +34,7 @@ long truncatedHashWithTime(long time) {
   
    uint8_t* hash;
    uint32_t a; 
-   Sha1.initHmac(hmacKey1,16);
+   Sha1.initHmac(hmacKey1,10);
    Sha1.writebytes(byteArray, 8);
    hash = Sha1.resultHmac();
   
@@ -67,13 +67,26 @@ void requestHandler() {
       sprintf(hashString,"%06ld\n",truncatedHashWithTime(pctime));
       Serial.print(hashString);
     } else if ( c == SEED_HEADER ) {
+      int result = 0;
+      int buffer = 0;
+      int bitsLeft = 0;
       for(int i=0; i < SEED_MSG_LEN-1; i++){    
         c = Serial.read();
-        // Convert base32 string into number and store it        
+        // Convert base32 string into number and store it
         if( c >= '2' && c <= '7'){   
-          hmacKey1[i] = 26 + (c - '2'); 
+          c = 26 + (c - '2'); 
         } else if ( c >= 'A' && c <= 'Z' ) {
-          hmacKey1[i] = c - 'A';
+          c = c - 'A';
+        }
+        buffer <<= 5;    
+        buffer |= c;
+        bitsLeft += 5;
+        if (bitsLeft >= 8)
+        {
+          hmacKey1[result] = (uint8_t)((unsigned int)(buffer >> (bitsLeft - 8)) & 0xFF);
+          EEPROM.write(i, hmacKey1[result]);
+          result++;
+          bitsLeft -= 8;
         }
       }
     }
