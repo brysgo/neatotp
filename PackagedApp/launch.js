@@ -105,7 +105,6 @@ SerialConnection.prototype.onRead = function(readInfo) {
 };
 
 SerialConnection.prototype.onWrite = function(writeInfo) {
-  console.log('wrote:' + writeInfo.bytesWritten);
   if (this.callbacks.write) {
     this.callbacks.write(writeInfo);
   }
@@ -138,7 +137,6 @@ var seed = "S" + "AAAAAAAAAAAAAAAA";
 var ser = new SerialConnection();
 ser.ping = 'T0000000000'
 ser.ack = function(response) {
-  console.log(response);
   if (response && response.length == 6)
     return true;
   else
