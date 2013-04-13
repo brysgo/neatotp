@@ -2,7 +2,8 @@
   "name": "NeatOTP",
   "version": "0.1",
   "manifest_version": 2,
-  "permissions": ["alarms",{"socket":["tcp-connect", "tcp-listen"]},"serial","storage"],
+  "permissions": ["alarms",{{"socket":["tcp-connect", "tcp-listen"]},"usb","serial","storage"],
+  "optional_permissions": [{"usbDevices": [{"vendorId": 5824, "productId": 1503}]}],
   "minimum_chrome_version": "23",
   "app": {
     "background": {

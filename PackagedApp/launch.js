@@ -134,6 +134,25 @@ stringToArrayBuffer = function(str) {
 ////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////
+var VENDOR_ID = 5824;
+var PRODUCT_ID = 1503;
+chrome.permissions.request(
+  {permissions: [
+      {'usbDevices': [{'vendorId': VENDOR_ID, "productId": PRODUCT_ID}] }
+   ]},
+function(result) {
+  if (result) {
+    requestButton.style.display = 'none';
+    console.log('App was granted the "usbDevices" permission.');
+    chrome.usb.findDevices(
+        {"vendorId": VENDOR_ID, "productId": PRODUCT_ID},
+       callback)
+  } else {
+    console.log('App was NOT granted the "usbDevices" permission.');
+  }
+});
+
+////////////////////////////////////////////////////////
 
 var seed = "S" + "AAAAAAAAAAAAAAAA";
 
