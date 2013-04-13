@@ -84,7 +84,7 @@ void requestHandler() {
         if (bitsLeft >= 8)
         {
           hmacKey1[result] = (uint8_t)((unsigned int)(buffer >> (bitsLeft - 8)) & 0xFF);
-          EEPROM.write(i, hmacKey1[result]);
+          EEPROM.write(result, hmacKey1[result]);
           result++;
           bitsLeft -= 8;
         }
