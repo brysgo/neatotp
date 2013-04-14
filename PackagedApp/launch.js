@@ -12,11 +12,12 @@ SerialConnection.prototype.connect = function(device, callback) {
 };
 
 SerialConnection.prototype.findAndConnect = function(callback) {
+  if (this.connectionId > -1) callback();
   var _this = this;
   var done = false;
   serial.getPorts(function(portList) {
     iter = function(i) {
-      if (i == portList.length) return 'Device not found';
+      if (i == portList.length) return callback(-1);
       var port = portList[i];
       if (port.search('Bluetooth') != -1) return iter(i+1);
       console.log(port);
@@ -28,6 +29,8 @@ SerialConnection.prototype.findAndConnect = function(callback) {
                 return serial.close(_this.connectionId,function(){
                   return iter(i+1);
                 });
+              } else {
+                callback(port);
               }
             });
           });
@@ -47,7 +50,7 @@ SerialConnection.prototype.findAndConnect = function(callback) {
 SerialConnection.prototype.read = function(callback) {
   // Only works for open serial ports.
   if (this.connectionId < 0) {
-    throw "Invalid connection";
+    callback(-1);
   }
   serial.read(this.connectionId, 1, this.onRead.bind(this));
   this.callbacks.read = callback;
@@ -55,7 +58,7 @@ SerialConnection.prototype.read = function(callback) {
 SerialConnection.prototype.readLine = function(callback) {
   // Only works for open serial ports.
   if (this.connectionId < 0) {
-    throw "Invalid connection";
+    callback(-1);
   }
   var line = '';
 
@@ -84,7 +87,7 @@ SerialConnection.prototype.readLine = function(callback) {
 SerialConnection.prototype.write = function(msg, callback) {
   // Only works for open serial ports.
   if (this.connectionId < 0) {
-    throw "Invalid connection";
+    callback(-1);
   }
   this.callbacks.write = callback;
   var array = stringToArrayBuffer(msg);
@@ -142,7 +145,6 @@ ser.ack = function(response) {
   else
     return false;
 }
-ser.findAndConnect();
 
 function getQueryVariable(url,name){
   if(name=(new RegExp('[?&]'+encodeURIComponent(name)+'=([^&]*)')).exec(url))
@@ -155,10 +157,23 @@ var socketInfo;
 var onAccept = function(acceptInfo) {
   console.log("ACCEPT", acceptInfo)
   var socketId = acceptInfo.socketId;
+  var serveMessage = function(msg) {
+    var outputBuffer = stringToArrayBuffer("HTTPS/1.0 200 OK\nContent-length: " + msg.length + "\nContent-type: text/html\n\n"+msg);
+    socket.write(socketId, outputBuffer, function(writeInfo) {
+      console.log("WRITE", writeInfo);
+      socket.destroy(socketId);
+      socket.accept(socketInfo.socketId, onAccept);
+    });
+  };
   socket.read(socketId, function(readInfo) {
     console.log("READ", readInfo);
     // Parse the request.
+    try {
     var data = arrayBufferToString(readInfo.data);
+    } catch (e) {
+      serveMessage("There was an error with your request.");
+      return;
+    }
     if(data.indexOf("GET ") == 0) {
 
       // we can only deal with GET requests
@@ -168,34 +183,23 @@ var onAccept = function(acceptInfo) {
 
       var origURL = getQueryVariable(uri,'url');
       if (!getQueryVariable(origURL,'smsUserPin')) {
-        try {
-        if (ser.connectionId == -1) ser.findAndConnect();
-        ser.write('T'+parseInt((new Date()).getTime()/1000), function(writeInfo) {
-          ser.readLine(function(otp) {
-            var msg = "<html><head><script>top.location='"+origURL+"&smsUserPin="+otp+"';</script></head><body></body></html>";
-            var outputBuffer = stringToArrayBuffer("HTTPS/1.0 200 OK\nContent-length: " + msg.length + "\nContent-type: text/html\n\n"+msg);
-            socket.write(socketId, outputBuffer, function(writeInfo) {
-              console.log("WRITE", writeInfo);
-              socket.destroy(socketId);
-              socket.accept(socketInfo.socketId, onAccept);
-            });
+          ser.findAndConnect( function(port) {
+              ser.write('T'+parseInt((new Date()).getTime()/1000), function(writeInfo) {
+                  if (writeInfo == -1) {
+                    serveMessage("Problem writing to device.");
+                    return;
+                  }
+                  ser.readLine(function(otp) {
+                    if (otp == -1) {
+                      serveMessage("Problem reading from device.");
+                      return;
+                    }
+                    var msg = "<html><head><script>top.location='"+origURL+"&smsUserPin="+otp+"';</script></head><body></body></html>";
+                    serveMessage(msg);
+                  });
+              });
           });
-        });
-        } catch (e) {
-          console.error(e);
-          var msg = 'There was a problem connecting to your NeatOTP device!';
-          socket.write(socketId, stringToArrayBuffer("HTTPS/1.0 200 OK\nContent-length: " + msg.length + "\nContent-type: text/html\n\n"+msg),function(writeInfo) {
-              console.log("WRITE", writeInfo);
-              socket.destroy(socketId);
-              socket.accept(socketInfo.socketId, onAccept);
-            });
-        }
       }
-    }
-    else {
-      // Throw an error
-      socket.destroy(socketId);
-      socket.accept(socketInfo.socketId, onAccept);
     }
   });
 };
@@ -216,10 +220,6 @@ var reconnect = function() {
 };
 
 reconnect();
-chrome.alarms.onAlarm.addListener( function(alarm) {
-  if (alarm.name === "Guard") {
-    console.log('hey');
-  }
-});
+chrome.alarms.onAlarm.addListener( function(alarm) {  });
 chrome.alarms.create("Guard", { periodInMinutes: 1.00 });
 
