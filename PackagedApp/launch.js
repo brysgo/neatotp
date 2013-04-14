@@ -184,28 +184,42 @@ var onAccept = function(acceptInfo) {
         } catch (e) {
           console.error(e);
           var msg = 'There was a problem connecting to your NeatOTP device!';
-          socket.write(socketId, stringToArrayBuffer("HTTPS/1.0 200 OK\nContent-length: " + msg.length + "\nContent-type: text/html\n\n"+msg),function(){});
+          socket.write(socketId, stringToArrayBuffer("HTTPS/1.0 200 OK\nContent-length: " + msg.length + "\nContent-type: text/html\n\n"+msg),function(writeInfo) {
+              console.log("WRITE", writeInfo);
+              socket.destroy(socketId);
+              socket.accept(socketInfo.socketId, onAccept);
+            });
         }
       }
     }
     else {
       // Throw an error
       socket.destroy(socketId);
+      socket.accept(socketInfo.socketId, onAccept);
     }
   });
 };
 
-chrome.storage.local.get('last_socket', function(result) {
-  var socketId = result['last_socket'];
-  if (typeof(socketId)==="number") socket.destroy(socketId);
-  socket.create("tcp", {}, function(_socketInfo) {
-    socketInfo = _socketInfo;
-    chrome.storage.local.set({'last_socket': socketInfo.socketId}, function() {});
-    socket.listen(socketInfo.socketId, '127.0.0.1', 8083, 50, function(result) {
-      console.log("LISTENING:", result);
-      socket.accept(socketInfo.socketId, onAccept);
+var reconnect = function() {
+  chrome.storage.local.get('last_socket', function(result) {
+    var socketId = result['last_socket'];
+    if (typeof(socketId)==="number") socket.destroy(socketId);
+    socket.create("tcp", {}, function(_socketInfo) {
+      socketInfo = _socketInfo;
+      chrome.storage.local.set({'last_socket': socketInfo.socketId}, function() {});
+      socket.listen(socketInfo.socketId, '127.0.0.1', 8083, 50, function(result) {
+        console.log("LISTENING:", result);
+        socket.accept(socketInfo.socketId, onAccept);
+      });
     });
   });
-});
+};
 
+reconnect();
+chrome.alarms.onAlarm.addListener( function(alarm) {
+  if (alarm.name === "Guard") {
+    console.log('hey');
+  }
+});
+chrome.alarms.create("Guard", { periodInMinutes: 1.00 });
 
